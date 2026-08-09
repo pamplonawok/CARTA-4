@@ -29,7 +29,7 @@ body{touch-action:pan-y pinch-zoom;font-family:Arial,sans-serif}
 #loading{position:fixed;inset:0;z-index:100;display:flex;align-items:center;justify-content:center;background:#000;color:#fff}
 #rotateOverlay{position:fixed;inset:0;z-index:90;background:#000;color:#fff;display:none;align-items:center;justify-content:center;text-align:center;padding:24px}
 #rotateOverlay .rotateBox{max-width:420px}
-#rotateOverlay .icons{display:flex;align-items:center;justify-content:center;gap:18px;margin-bottom:18px;font-size:54px;line-height:1}.rotateFs{font-size:46px;font-weight:700}.rotatePlus{font-size:34px;opacity:.7}
+#rotateOverlay .phone{font-size:58px;line-height:1;margin-bottom:18px;display:inline-block;animation:turnPhone 1.5s ease-in-out infinite}
 #rotateOverlay h1{margin:0 0 10px;font-size:30px}
 #rotateOverlay p{margin:0 0 22px;font-size:16px;opacity:.85}
 #enterFullscreen{border:0;border-radius:12px;padding:14px 22px;background:#fff;color:#000;font-weight:700;font-size:15px;cursor:pointer}
@@ -40,7 +40,7 @@ body{touch-action:pan-y pinch-zoom;font-family:Arial,sans-serif}
 </head>
 <body>
 <div id="loading">Cargando carta…</div>
-<div id="rotateOverlay"><div class="rotateBox"><div class="icons"><span class="phone">📱↻</span><span class="rotatePlus">+</span><span class="rotateFs">⛶</span></div><h1>GIRA EL MÓVIL + ⛶</h1><p>Pon el móvil en horizontal y pulsa el botón ⛶ para entrar en pantalla completa.</p><button id="enterFullscreen" type="button" aria-label="Entrar en pantalla completa">⛶</button></div></div>
+<div id="rotateOverlay"><div class="rotateBox"><div class="phone">📱↻</div><h1>GIRA EL MÓVIL</h1><p>Pon el móvil en horizontal para ver la carta correctamente.</p><button id="enterFullscreen" type="button">⛶ ENTRAR EN PANTALLA COMPLETA</button></div></div>
 <div id="viewer"><div id="stage"><img id="slide" src="slides/1.png" alt="Carta Mr. Wok"></div><button id="fullscreen" type="button" aria-label="Pantalla completa">⛶</button><button id="home" type="button">Inicio</button></div>
 <script>
 const DATA={
@@ -459,32 +459,8 @@ function updateOrientationOverlay(){
   rotateOverlay.style.display=isPortrait()?'flex':'none';
 }
 window.addEventListener('resize',updateOrientationOverlay);
-async function requestFullscreen(){
-  const isFS=!!(document.fullscreenElement||document.webkitFullscreenElement);
-  if(isFS) return true;
-  try{
-    const el=document.documentElement;
-    if(el.requestFullscreen){ await el.requestFullscreen(); return true; }
-    if(el.webkitRequestFullscreen){ el.webkitRequestFullscreen(); return true; }
-  }catch(e){ console.warn('Fullscreen requiere una acción del usuario.',e); }
-  return false;
-}
-async function onRotate(){
-  updateOrientationOverlay();
-  if(!isPortrait()) updateFullscreenButton();
-}
-window.addEventListener('orientationchange',()=>setTimeout(onRotate,150));
-if(window.visualViewport) window.visualViewport.addEventListener('resize',()=>setTimeout(onRotate,100));
-const enterFullscreenBtn=document.getElementById('enterFullscreen');
-enterFullscreenBtn.addEventListener('click',async e=>{
-  e.preventDefault(); e.stopPropagation();
-  const ok=await requestFullscreen();
-  if(ok){
-    try{ if(screen.orientation && screen.orientation.lock) await screen.orientation.lock('landscape'); }catch(_e){}
-    updateOrientationOverlay();
-    updateFullscreenButton();
-  }
-});
+window.addEventListener('orientationchange',()=>setTimeout(updateOrientationOverlay,100));
+if(window.visualViewport) window.visualViewport.addEventListener('resize',updateOrientationOverlay);
 let currentSlide=1;
 function readSlide(){const v=Number.parseInt(location.hash.slice(1),10);return Number.isInteger(v)&&v>=1&&v<=DATA.count?v:1;}
 function goTo(n){currentSlide=Math.max(1,Math.min(DATA.count,n));history.replaceState(null,'','#'+currentSlide);draw();}
@@ -530,9 +506,14 @@ async function toggleFullscreen(){
       if(document.exitFullscreen) await document.exitFullscreen();
       else if(document.webkitExitFullscreen) document.webkitExitFullscreen();
     }else{
-      await requestFullscreen();
+      const el=document.documentElement;
+      if(el.requestFullscreen) await el.requestFullscreen();
+      else if(el.webkitRequestFullscreen) el.webkitRequestFullscreen();
+      else if(el.webkitEnterFullscreen) el.webkitEnterFullscreen();
     }
-  }catch(e){ console.warn('Fullscreen no disponible en este navegador',e); }
+  }catch(e){
+    console.warn('Fullscreen no disponible en este navegador',e);
+  }
   updateFullscreenButton();
 }
 function updateFullscreenButton(){
