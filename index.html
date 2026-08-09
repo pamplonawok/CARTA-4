@@ -2,15 +2,15 @@
 <html lang="es">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=yes, maximum-scale=5">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
 <meta name="theme-color" content="#000000">
 <title>Mr. Wok — Carta 3.3</title>
 <style>
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
 html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#000}
-body{touch-action:pan-y pinch-zoom;font-family:Arial,sans-serif}
+body{touch-action:none;font-family:Arial,sans-serif}
 #viewer{position:fixed;inset:0;background:#000;display:flex;align-items:center;justify-content:center}
-#stage{position:relative;width:min(100vw,177.7777778vh);height:min(56.25vw,100vh);aspect-ratio:16/9;overflow:hidden;background:#000;transform-origin:center center;transform:scale(1);will-change:transform}
+#stage{position:relative;transform-origin:0 0;will-change:transform;width:min(100vw,177.7777778vh);height:min(56.25vw,100vh);aspect-ratio:16/9;overflow:hidden;background:#000}
 #slide{position:absolute;inset:0;width:100%;height:100%;display:block;object-fit:fill;user-select:none;-webkit-user-drag:none;pointer-events:none}
 .hotspot{position:absolute;z-index:10;display:flex;align-items:center;justify-content:center;border:0;padding:0;margin:0;background:transparent;cursor:pointer;outline:none;overflow:hidden;isolation:isolate;transition:transform .12s ease,filter .12s ease}
 .hotspot img{display:block;width:100%;height:100%;object-fit:contain;user-select:none;-webkit-user-drag:none;pointer-events:none;transition:transform .16s ease,filter .16s ease;transform-origin:center}
@@ -512,9 +512,48 @@ async function enterFullscreenFromOverlay(e){
 enterFullscreenBtn.addEventListener('click',enterFullscreenFromOverlay);
 enterFullscreenBtn.addEventListener('touchend',enterFullscreenFromOverlay,{passive:false});
 
+// Zoom táctil REAL e independiente del navegador: pellizco con dos dedos.
+const zoomState={scale:1,min:1,max:3,tx:0,ty:0};
+let pinch=null;
+function clamp(v,a,b){return Math.max(a,Math.min(b,v));}
+function applyZoom(){
+  stage.style.transform=`translate(${zoomState.tx}px,${zoomState.ty}px) scale(${zoomState.scale})`;
+}
+function resetZoom(){zoomState.scale=1;zoomState.tx=0;zoomState.ty=0;applyZoom();}
+function dist(a,b){return Math.hypot(a.clientX-b.clientX,a.clientY-b.clientY);}
+function mid(a,b){return {x:(a.clientX+b.clientX)/2,y:(a.clientY+b.clientY)/2};}
+function handlePinchStart(e){
+  if(e.touches.length!==2)return;
+  e.preventDefault();
+  const a=e.touches[0],b=e.touches[1],m=mid(a,b);
+  pinch={distance:dist(a,b),scale:zoomState.scale,mid:m,tx:zoomState.tx,ty:zoomState.ty};
+}
+function handlePinchMove(e){
+  if(!pinch||e.touches.length!==2)return;
+  e.preventDefault();
+  const a=e.touches[0],b=e.touches[1];
+  const d=dist(a,b),m=mid(a,b);
+  const next=clamp(pinch.scale*(d/pinch.distance),zoomState.min,zoomState.max);
+  // Mantener el punto bajo los dedos en la misma posición mientras se amplía.
+  const ratio=next/pinch.scale;
+  zoomState.scale=next;
+  zoomState.tx=m.x-(pinch.mid.x-pinch.tx)*ratio;
+  zoomState.ty=m.y-(pinch.mid.y-pinch.ty)*ratio;
+  applyZoom();
+}
+function handlePinchEnd(e){
+  if(e.touches.length<2)pinch=null;
+  if(zoomState.scale<=1.01)resetZoom();
+}
+viewer.addEventListener('touchstart',handlePinchStart,{passive:false});
+viewer.addEventListener('touchmove',handlePinchMove,{passive:false});
+viewer.addEventListener('touchend',handlePinchEnd,{passive:false});
+viewer.addEventListener('touchcancel',handlePinchEnd,{passive:false});
+window.addEventListener('resize',()=>{if(zoomState.scale===1)resetZoom();});
+
 let currentSlide=1;
 function readSlide(){const v=Number.parseInt(location.hash.slice(1),10);return Number.isInteger(v)&&v>=1&&v<=DATA.count?v:1;}
-function goTo(n){currentSlide=Math.max(1,Math.min(DATA.count,n));history.replaceState(null,'','#'+currentSlide);draw();}
+function goTo(n){currentSlide=Math.max(1,Math.min(DATA.count,n));resetZoom();history.replaceState(null,'','#'+currentSlide);draw();}
 function addButton(link,external=false){
  const b=document.createElement('button'); b.type='button'; b.className='hotspot';
  const shape=link.shape||'';
@@ -577,40 +616,6 @@ updateOrientationOverlay();
 document.addEventListener('touchstart',e=>{const t=e.target.closest('.hotspot,#home,#fullscreen');if(t)t.classList.add('is-touching');},{passive:true});
 document.addEventListener('touchend',()=>document.querySelectorAll('.is-touching').forEach(e=>e.classList.remove('is-touching')),{passive:true});
 document.addEventListener('touchcancel',()=>document.querySelectorAll('.is-touching').forEach(e=>e.classList.remove('is-touching')),{passive:true});
-
-// Zoom táctil: pellizco con dos dedos para ampliar/reducir la diapositiva.
-// No usa el gesto de deslizar para navegar entre diapositivas.
-let pinchStartDistance = 0;
-let pinchStartScale = 1;
-let pageScale = 1;
-const MIN_ZOOM = 1;
-const MAX_ZOOM = 3;
-function touchDistance(t1,t2){
-  const dx=t2.clientX-t1.clientX, dy=t2.clientY-t1.clientY;
-  return Math.hypot(dx,dy);
-}
-function applyPageZoom(){
-  stage.style.transform=`scale(${pageScale})`;
-}
-stage.addEventListener('touchstart',e=>{
-  if(e.touches.length===2){
-    pinchStartDistance=touchDistance(e.touches[0],e.touches[1]);
-    pinchStartScale=pageScale;
-  }
-},{passive:true});
-stage.addEventListener('touchmove',e=>{
-  if(e.touches.length===2 && pinchStartDistance>0){
-    const distance=touchDistance(e.touches[0],e.touches[1]);
-    const factor=distance/pinchStartDistance;
-    pageScale=Math.min(MAX_ZOOM,Math.max(MIN_ZOOM,pinchStartScale*factor));
-    applyPageZoom();
-    e.preventDefault();
-  }
-},{passive:false});
-stage.addEventListener('touchend',e=>{
-  if(e.touches.length<2) pinchStartDistance=0;
-},{passive:true});
-stage.addEventListener('touchcancel',()=>{pinchStartDistance=0;},{passive:true});
 currentSlide=readSlide();draw();
 </script>
 </body>
