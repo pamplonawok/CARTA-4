@@ -518,5 +518,61 @@ document.addEventListener('touchend',()=>document.querySelectorAll('.is-touching
 document.addEventListener('touchcancel',()=>document.querySelectorAll('.is-touching').forEach(e=>e.classList.remove('is-touching')),{passive:true});
 currentSlide=readSlide();draw();
 </script>
+
+<script>
+(function () {
+  function isFullscreen() {
+    return !!(document.fullscreenElement || document.webkitFullscreenElement);
+  }
+
+  async function enterFullscreen() {
+    const el = document.documentElement;
+    try {
+      if (el.requestFullscreen) await el.requestFullscreen();
+      else if (el.webkitRequestFullscreen) el.webkitRequestFullscreen();
+    } catch (e) {}
+  }
+
+  async function exitFullscreen() {
+    try {
+      if (document.exitFullscreen) await document.exitFullscreen();
+      else if (document.webkitExitFullscreen) document.webkitExitFullscreen();
+    } catch (e) {}
+  }
+
+  async function toggleFullscreen() {
+    if (isFullscreen()) await exitFullscreen();
+    else await enterFullscreen();
+    updateButtons();
+  }
+
+  function updateButtons() {
+    const buttons = document.querySelectorAll(
+      '[aria-label*="pantalla"], [title*="pantalla"], .fullscreen-btn, #fullscreenBtn, #fullscreen-button'
+    );
+    buttons.forEach(function(btn) {
+      btn.textContent = isFullscreen() ? '⛶' : '⛶';
+      btn.setAttribute('aria-label', isFullscreen() ? 'Salir de pantalla completa' : 'Entrar en pantalla completa');
+      btn.setAttribute('title', isFullscreen() ? 'Salir de pantalla completa' : 'Entrar en pantalla completa');
+    });
+  }
+
+  document.addEventListener('click', function (e) {
+    const btn = e.target.closest && e.target.closest(
+      '[aria-label*="pantalla"], [title*="pantalla"], .fullscreen-btn, #fullscreenBtn, #fullscreen-button'
+    );
+    if (btn) {
+      e.preventDefault();
+      e.stopPropagation();
+      toggleFullscreen();
+    }
+  }, true);
+
+  document.addEventListener('fullscreenchange', updateButtons);
+  document.addEventListener('webkitfullscreenchange', updateButtons);
+  updateButtons();
+})();
+</script>
+
 </body>
 </html>
