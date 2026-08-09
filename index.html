@@ -448,6 +448,19 @@ const DATA={
 const stage=document.getElementById('stage');
 const slide=document.getElementById('slide');
 const loading=document.getElementById('loading');
+const rotateOverlay=document.getElementById('rotateOverlay');
+function isPortrait(){
+  const vv=window.visualViewport;
+  const w=vv?vv.width:window.innerWidth;
+  const h=vv?vv.height:window.innerHeight;
+  return w < h;
+}
+function updateOrientationOverlay(){
+  rotateOverlay.style.display=isPortrait()?'flex':'none';
+}
+window.addEventListener('resize',updateOrientationOverlay);
+window.addEventListener('orientationchange',()=>setTimeout(updateOrientationOverlay,100));
+if(window.visualViewport) window.visualViewport.addEventListener('resize',updateOrientationOverlay);
 let currentSlide=1;
 function readSlide(){const v=Number.parseInt(location.hash.slice(1),10);return Number.isInteger(v)&&v>=1&&v<=DATA.count?v:1;}
 function goTo(n){currentSlide=Math.max(1,Math.min(DATA.count,n));history.replaceState(null,'','#'+currentSlide);draw();}
@@ -524,6 +537,7 @@ document.getElementById('enterFullscreen').addEventListener('click',enterFullscr
 document.addEventListener('fullscreenchange',updateFullscreenButton);
 document.addEventListener('webkitfullscreenchange',updateFullscreenButton);
 updateFullscreenButton();
+updateOrientationOverlay();
 document.addEventListener('touchstart',e=>{const t=e.target.closest('.hotspot,#home,#fullscreen');if(t)t.classList.add('is-touching');},{passive:true});
 document.addEventListener('touchend',()=>document.querySelectorAll('.is-touching').forEach(e=>e.classList.remove('is-touching')),{passive:true});
 document.addEventListener('touchcancel',()=>document.querySelectorAll('.is-touching').forEach(e=>e.classList.remove('is-touching')),{passive:true});
