@@ -459,8 +459,21 @@ function updateOrientationOverlay(){
   rotateOverlay.style.display=isPortrait()?'flex':'none';
 }
 window.addEventListener('resize',updateOrientationOverlay);
-window.addEventListener('orientationchange',()=>setTimeout(updateOrientationOverlay,100));
-if(window.visualViewport) window.visualViewport.addEventListener('resize',updateOrientationOverlay);
+async function enterFullscreenOnLandscape(){
+  updateOrientationOverlay();
+  if(isPortrait()) return;
+  const isFS=!!(document.fullscreenElement||document.webkitFullscreenElement);
+  if(isFS) return;
+  try{
+    const el=document.documentElement;
+    if(el.requestFullscreen) await el.requestFullscreen();
+    else if(el.webkitRequestFullscreen) el.webkitRequestFullscreen();
+  }catch(e){
+    console.warn('El navegador no permite activar fullscreen automáticamente al girar.',e);
+  }
+}
+window.addEventListener('orientationchange',()=>setTimeout(enterFullscreenOnLandscape,150));
+if(window.visualViewport) window.visualViewport.addEventListener('resize',()=>setTimeout(enterFullscreenOnLandscape,100));
 let currentSlide=1;
 function readSlide(){const v=Number.parseInt(location.hash.slice(1),10);return Number.isInteger(v)&&v>=1&&v<=DATA.count?v:1;}
 function goTo(n){currentSlide=Math.max(1,Math.min(DATA.count,n));history.replaceState(null,'','#'+currentSlide);draw();}
