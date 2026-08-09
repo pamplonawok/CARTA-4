@@ -27,13 +27,33 @@ body{touch-action:pan-y pinch-zoom;font-family:Arial,sans-serif}
 #fullscreen{position:fixed;right:10px;top:max(10px,env(safe-area-inset-top));z-index:50;width:44px;height:44px;border:0;border-radius:50%;background:rgba(0,0,0,.55);color:#fff;font-size:22px}
 #home{position:fixed;left:10px;bottom:max(10px,env(safe-area-inset-bottom));z-index:50;border:0;border-radius:22px;padding:9px 15px;background:rgba(0,0,0,.55);color:#fff;font-size:13px}
 #loading{position:fixed;inset:0;z-index:100;display:flex;align-items:center;justify-content:center;background:#000;color:#fff}
+#rotatePrompt{position:fixed;inset:0;z-index:90;display:none;align-items:center;justify-content:center;background:rgba(0,0,0,.96);color:#fff;text-align:center;padding:24px}
+.rotate-card{max-width:360px;padding:26px 22px;border-radius:18px;background:#111;border:1px solid rgba(255,255,255,.12);box-shadow:0 8px 30px rgba(0,0,0,.6)}
+.rotate-icon{font-size:58px;line-height:1;margin-bottom:12px;color:#e32626}.rotate-title{font-size:24px;font-weight:700;letter-spacing:1px}.rotate-text{margin:10px 0 20px;font-size:15px;line-height:1.4;color:#ddd}.rotate-card button{border:0;border-radius:10px;padding:12px 16px;background:#e32626;color:#fff;font-weight:700;font-size:13px;box-shadow:0 3px 0 #8e1111}
 @media (prefers-reduced-motion:reduce){.hotspot,.hotspot img{transition:none!important}}
 </style>
 </head>
 <body>
 <div id="loading">Cargando carta…</div>
+<div id="rotatePrompt" aria-live="polite"><div class="rotate-card"><div class="rotate-icon">↻</div><div class="rotate-title">GIRA EL MÓVIL</div><div class="rotate-text">Coloca el móvil en horizontal para ver la carta.</div><button id="enterFullscreen" type="button">ENTRAR EN PANTALLA COMPLETA</button></div></div>
 <div id="viewer"><div id="stage"><img id="slide" src="slides/1.png" alt="Carta Mr. Wok"></div><button id="fullscreen" type="button" aria-label="Pantalla completa">⛶</button><button id="home" type="button">Inicio</button></div>
 <script>
+
+function isPortrait(){ return window.matchMedia('(orientation: portrait)').matches; }
+function updateOrientationPrompt(){
+  const prompt=document.getElementById('rotatePrompt');
+  if(!prompt) return;
+  prompt.style.display=isPortrait() ? 'flex' : 'none';
+}
+async function requestFullscreen(){
+  try {
+    const el=document.documentElement;
+    if(!document.fullscreenElement && el.requestFullscreen) await el.requestFullscreen();
+    if(screen.orientation && screen.orientation.lock) { try { await screen.orientation.lock('landscape'); } catch(e) {} }
+  } catch(e) {}
+  updateOrientationPrompt();
+}
+
 const DATA={
   "count": 14,
   "links": {
@@ -476,11 +496,15 @@ function draw(){
 slide.addEventListener('load',()=>loading.style.display='none');
 window.addEventListener('hashchange',draw);
 document.getElementById('home').addEventListener('click',()=>goTo(1));
-document.getElementById('fullscreen').addEventListener('click',async()=>{try{if(!document.fullscreenElement)await document.documentElement.requestFullscreen();else await document.exitFullscreen();}catch(e){}});
 document.addEventListener('touchstart',e=>{const t=e.target.closest('.hotspot,#home,#fullscreen');if(t)t.classList.add('is-touching');},{passive:true});
 document.addEventListener('touchend',()=>document.querySelectorAll('.is-touching').forEach(e=>e.classList.remove('is-touching')),{passive:true});
 document.addEventListener('touchcancel',()=>document.querySelectorAll('.is-touching').forEach(e=>e.classList.remove('is-touching')),{passive:true});
 currentSlide=readSlide();draw();
+document.getElementById('fullscreen').addEventListener('click', requestFullscreen);
+document.getElementById('enterFullscreen').addEventListener('click', requestFullscreen);
+window.addEventListener('resize', updateOrientationPrompt, {passive:true});
+window.addEventListener('orientationchange', updateOrientationPrompt, {passive:true});
+updateOrientationPrompt();
 </script>
 </body>
 </html>
