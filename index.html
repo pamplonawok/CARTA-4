@@ -494,42 +494,24 @@ slide.addEventListener('load',()=>loading.style.display='none');
 window.addEventListener('hashchange',draw);
 document.getElementById('home').addEventListener('click',()=>goTo(1));
 async function enterFullscreen(){
- const btn=document.getElementById('enter-fullscreen');
- try{
-   if(document.fullscreenElement){
-     if(screen.orientation && screen.orientation.lock){
-       try{await screen.orientation.lock('landscape');}catch(e){}
-     }
-     document.getElementById('orientation').classList.remove('force-show');
-     return true;
-   }
-   if(document.documentElement.requestFullscreen){
-     await document.documentElement.requestFullscreen({navigationUI:'hide'});
-   } else if(document.documentElement.webkitRequestFullscreen){
-     document.documentElement.webkitRequestFullscreen();
-   } else {
-     throw new Error('fullscreen-unsupported');
-   }
-   if(screen.orientation && screen.orientation.lock){
-     try{await screen.orientation.lock('landscape');}catch(e){}
-   }
-   document.getElementById('orientation').classList.remove('force-show');
-   btn.textContent='PANTALLA COMPLETA ACTIVADA';
-   setTimeout(()=>{btn.textContent='ENTRAR EN PANTALLA COMPLETA';},1800);
-   return true;
- }catch(e){
-   btn.textContent='PULSA PARA ACTIVAR PANTALLA COMPLETA';
-   return false;
- }
+  try{
+    if(!document.fullscreenElement){
+      const target=document.documentElement;
+      if(target.requestFullscreen) await target.requestFullscreen({navigationUI:'hide'});
+    }
+    // En móviles compatibles, intenta bloquear la orientación en horizontal.
+    try{
+      if(screen.orientation && screen.orientation.lock){
+        await screen.orientation.lock('landscape');
+      }
+    }catch(e){}
+  }catch(e){
+    // Algunos navegadores requieren que el gesto del usuario sea directo
+    // o no permiten fullscreen desde una página web normal.
+  }
 }
-
 document.getElementById('fullscreen').addEventListener('click',enterFullscreen);
 document.getElementById('enter-fullscreen').addEventListener('click',enterFullscreen);
-
-document.addEventListener('fullscreenchange',()=>{
- const btn=document.getElementById('enter-fullscreen');
- if(!document.fullscreenElement) btn.textContent='ENTRAR EN PANTALLA COMPLETA';
-});
 
 document.addEventListener('touchstart',e=>{const t=e.target.closest('.hotspot,#home,#fullscreen');if(t)t.classList.add('is-touching');},{passive:true});
 document.addEventListener('touchend',()=>document.querySelectorAll('.is-touching').forEach(e=>e.classList.remove('is-touching')),{passive:true});
