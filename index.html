@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=yes">
 <meta name="theme-color" content="#000000">
 <title>Mr. Wok — Carta 3.3</title>
 <style>
@@ -512,43 +512,56 @@ async function enterFullscreenFromOverlay(e){
 enterFullscreenBtn.addEventListener('click',enterFullscreenFromOverlay);
 enterFullscreenBtn.addEventListener('touchend',enterFullscreenFromOverlay,{passive:false});
 
-// Zoom táctil REAL e independiente del navegador: pellizco con dos dedos.
-const zoomState={scale:1,min:1,max:3,tx:0,ty:0};
+// Zoom táctil REAL independiente del navegador: Pointer Events + dos dedos.
+const zoomState={scale:1,min:1,max:4,tx:0,ty:0};
+const pointers=new Map();
 let pinch=null;
 function clamp(v,a,b){return Math.max(a,Math.min(b,v));}
 function applyZoom(){
-  stage.style.transform=`translate(${zoomState.tx}px,${zoomState.ty}px) scale(${zoomState.scale})`;
+  stage.style.transform=`translate3d(${zoomState.tx}px,${zoomState.ty}px,0) scale(${zoomState.scale})`;
 }
-function resetZoom(){zoomState.scale=1;zoomState.tx=0;zoomState.ty=0;applyZoom();}
-function dist(a,b){return Math.hypot(a.clientX-b.clientX,a.clientY-b.clientY);}
-function mid(a,b){return {x:(a.clientX+b.clientX)/2,y:(a.clientY+b.clientY)/2};}
-function handlePinchStart(e){
-  if(e.touches.length!==2)return;
-  e.preventDefault();
-  const a=e.touches[0],b=e.touches[1],m=mid(a,b);
-  pinch={distance:dist(a,b),scale:zoomState.scale,mid:m,tx:zoomState.tx,ty:zoomState.ty};
+function resetZoom(){zoomState.scale=1;zoomState.tx=0;zoomState.ty=0;pinch=null;applyZoom();}
+function pDistance(a,b){return Math.hypot(a.clientX-b.clientX,a.clientY-b.clientY);}
+function pMid(a,b){return {x:(a.clientX+b.clientX)/2,y:(a.clientY+b.clientY)/2};}
+function startPinch(){
+  if(pointers.size!==2)return;
+  const [a,b]=[...pointers.values()];
+  const m=pMid(a,b);
+  pinch={distance:pDistance(a,b),scale:zoomState.scale,mid:m,tx:zoomState.tx,ty:zoomState.ty};
 }
-function handlePinchMove(e){
-  if(!pinch||e.touches.length!==2)return;
-  e.preventDefault();
-  const a=e.touches[0],b=e.touches[1];
-  const d=dist(a,b),m=mid(a,b);
+function movePinch(){
+  if(!pinch || pointers.size!==2)return;
+  const [a,b]=[...pointers.values()];
+  const d=pDistance(a,b),m=pMid(a,b);
   const next=clamp(pinch.scale*(d/pinch.distance),zoomState.min,zoomState.max);
-  // Mantener el punto bajo los dedos en la misma posición mientras se amplía.
   const ratio=next/pinch.scale;
   zoomState.scale=next;
   zoomState.tx=m.x-(pinch.mid.x-pinch.tx)*ratio;
   zoomState.ty=m.y-(pinch.mid.y-pinch.ty)*ratio;
   applyZoom();
 }
-function handlePinchEnd(e){
-  if(e.touches.length<2)pinch=null;
-  if(zoomState.scale<=1.01)resetZoom();
+function pointerDown(e){
+  if(e.pointerType!=='touch')return;
+  pointers.set(e.pointerId,{clientX:e.clientX,clientY:e.clientY});
+  try{e.currentTarget.setPointerCapture(e.pointerId);}catch(_){}
+  if(pointers.size===2){e.preventDefault();startPinch();}
 }
-viewer.addEventListener('touchstart',handlePinchStart,{passive:false});
-viewer.addEventListener('touchmove',handlePinchMove,{passive:false});
-viewer.addEventListener('touchend',handlePinchEnd,{passive:false});
-viewer.addEventListener('touchcancel',handlePinchEnd,{passive:false});
+function pointerMove(e){
+  if(e.pointerType!=='touch' || !pointers.has(e.pointerId))return;
+  pointers.set(e.pointerId,{clientX:e.clientX,clientY:e.clientY});
+  if(pointers.size===2){e.preventDefault();movePinch();}
+}
+function pointerEnd(e){
+  if(e.pointerType!=='touch')return;
+  pointers.delete(e.pointerId);
+  if(pointers.size<2)pinch=null;
+  if(pointers.size===0 && zoomState.scale<=1.01)resetZoom();
+}
+viewer.addEventListener('pointerdown',pointerDown,{passive:false});
+viewer.addEventListener('pointermove',pointerMove,{passive:false});
+viewer.addEventListener('pointerup',pointerEnd,{passive:false});
+viewer.addEventListener('pointercancel',pointerEnd,{passive:false});
+viewer.addEventListener('pointerleave',pointerEnd,{passive:false});
 window.addEventListener('resize',()=>{if(zoomState.scale===1)resetZoom();});
 
 let currentSlide=1;
