@@ -460,47 +460,58 @@ function updateOrientationOverlay(){
 }
 window.addEventListener('resize',updateOrientationOverlay);
 async function requestFullscreen(){
-  const isFS=!!(document.fullscreenElement||document.webkitFullscreenElement);
-  if(isFS) return true;
-  try{
-    // Usamos el visor completo como objetivo para que el gesto del botón
-    // sea el que inicia directamente la solicitud de fullscreen.
-    const el=document.getElementById('viewer') || document.documentElement;
-    if(el.requestFullscreen){
+  const fs = document.fullscreenElement || document.webkitFullscreenElement || document.msFullscreenElement;
+  if(fs) return true;
+  const el = document.documentElement;
+  try {
+    if (el.requestFullscreen) {
       await el.requestFullscreen({navigationUI:'hide'});
-      return !!(document.fullscreenElement===el);
+      return !!document.fullscreenElement;
     }
-    if(el.webkitRequestFullscreen){
+    if (el.webkitRequestFullscreen) {
       el.webkitRequestFullscreen();
       return true;
     }
-  }catch(e){ console.warn('Fullscreen no disponible en este navegador.',e); }
+    if (el.msRequestFullscreen) {
+      el.msRequestFullscreen();
+      return true;
+    }
+  } catch(err) {
+    console.warn('Fullscreen rechazado:', err);
+  }
   return false;
 }
-async function onRotate(){
-  updateOrientationOverlay();
-  if(!isPortrait()) updateFullscreenButton();
+function updateOrientationOverlay(){
+  rotateOverlay.style.display=isPortrait()?'flex':'none';
 }
+function onRotate(){
+  updateOrientationOverlay();
+  updateFullscreenButton();
+}
+window.addEventListener('resize',()=>setTimeout(onRotate,100));
 window.addEventListener('orientationchange',()=>setTimeout(onRotate,150));
 if(window.visualViewport) window.visualViewport.addEventListener('resize',()=>setTimeout(onRotate,100));
 const enterFullscreenBtn=document.getElementById('enterFullscreen');
+let fullscreenTapLock=false;
 async function enterFullscreenFromOverlay(e){
   if(e){ e.preventDefault(); e.stopPropagation(); }
+  if(fullscreenTapLock) return;
+  fullscreenTapLock=true;
   const ok=await requestFullscreen();
   if(ok){
-    try{
-      if(screen.orientation && screen.orientation.lock) await screen.orientation.lock('landscape');
-    }catch(_e){}
-    // El botón deja de bloquear la pantalla en cuanto fullscreen se ha activado.
     rotateOverlay.style.display='none';
+    try {
+      if(screen.orientation && screen.orientation.lock){
+        await screen.orientation.lock('landscape');
+      }
+    } catch(_) {}
     updateFullscreenButton();
-  }else{
-    // Si el navegador rechaza fullscreen, mantenemos el aviso y no ocultamos nada.
-    rotateOverlay.style.display=isPortrait()?'flex':'none';
   }
+  setTimeout(()=>fullscreenTapLock=false,500);
 }
 enterFullscreenBtn.addEventListener('click',enterFullscreenFromOverlay);
 enterFullscreenBtn.addEventListener('touchend',enterFullscreenFromOverlay,{passive:false});
+
 let currentSlide=1;
 function readSlide(){const v=Number.parseInt(location.hash.slice(1),10);return Number.isInteger(v)&&v>=1&&v<=DATA.count?v:1;}
 function goTo(n){currentSlide=Math.max(1,Math.min(DATA.count,n));history.replaceState(null,'','#'+currentSlide);draw();}
